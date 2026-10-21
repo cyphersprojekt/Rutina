@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Rutina</string>
+    <string name="widget_counters_label">Contadores</string>
+    <string name="widget_counters_description">Sumá a tus contadores de hoy sin abrir la app</string>
+    <string name="widget_single_counter_label">Un contador</string>
+    <string name="widget_single_counter_description">Un solo contador, con su total de hoy y sus botones</string>
+</resources>

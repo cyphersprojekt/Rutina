@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
@@ -174,6 +176,53 @@ private fun trendColor(trend: Trend?, goal: CounterGoal): Color = when (trend?.i
     null -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
+/** Dónde quedaron las barras dentro del Canvas, para dibujar encima o debajo de ellas. */
+private class BarArea(val left: Float, val top: Float, val width: Float, val height: Float, count: Int) {
+    val right: Float get() = left + width
+    val baseline: Float get() = top + height
+
+    /** Ancho que le toca a cada barra, con su espacio a los costados. */
+    val slot: Float = width / count
+}
+
+/**
+ * La escala (el cero y [max]) y una barra por valor, de izquierda a derecha. Deja lugar a la
+ * izquierda para los números y abajo para una fila de etiquetas.
+ */
+private fun DrawScope.drawBars(
+    values: List<Int>,
+    max: Int,
+    barColor: Color,
+    gridColor: Color,
+    measurer: TextMeasurer,
+    labelStyle: TextStyle,
+): BarArea {
+    val area = BarArea(
+        left = 36.dp.toPx(),
+        top = 8.dp.toPx(),
+        width = size.width - 44.dp.toPx(),
+        height = size.height - 28.dp.toPx(),
+        count = values.size,
+    )
+    listOf(max to area.top, 0 to area.baseline).forEach { (value, lineY) ->
+        drawLine(gridColor, Offset(area.left, lineY), Offset(area.right, lineY), strokeWidth = 1.dp.toPx())
+        val label = measurer.measure("$value", labelStyle)
+        drawText(label, topLeft = Offset(area.left - label.size.width - 6.dp.toPx(), lineY - label.size.height / 2f))
+    }
+    val barWidth = (area.slot * 0.7f).coerceAtLeast(1.dp.toPx())
+    values.forEachIndexed { index, value ->
+        if (value == 0) return@forEachIndexed
+        val barHeight = area.height * value / max
+        drawRoundRect(
+            color = barColor,
+            topLeft = Offset(area.left + area.slot * index + (area.slot - barWidth) / 2, area.baseline - barHeight),
+            size = Size(barWidth, barHeight),
+            cornerRadius = CornerRadius(2.dp.toPx()),
+        )
+    }
+    return area
+}
+
 /** Barras con el total de cada día y, si hay, la recta de tendencia encima. */
 @Composable
 fun DailyBarChart(daily: List<Pair<LocalDate, Int>>, trend: Trend?, goal: CounterGoal, modifier: Modifier = Modifier) {
@@ -190,40 +239,15 @@ fun DailyBarChart(daily: List<Pair<LocalDate, Int>>, trend: Trend?, goal: Counte
     val max = maxOf(daily.maxOf { it.second }, trendMax).coerceAtLeast(1)
 
     Canvas(modifier.fillMaxWidth().height(180.dp)) {
-        val left = 36.dp.toPx()
-        val right = 8.dp.toPx()
-        val top = 8.dp.toPx()
-        val bottom = 20.dp.toPx()
-        val width = size.width - left - right
-        val height = size.height - top - bottom
-        val baseline = top + height
-
-        listOf(max to top, 0 to baseline).forEach { (value, lineY) ->
-            drawLine(gridColor, Offset(left, lineY), Offset(size.width - right, lineY), strokeWidth = 1.dp.toPx())
-            val label = measurer.measure("$value", labelStyle)
-            drawText(label, topLeft = Offset(left - label.size.width - 6.dp.toPx(), lineY - label.size.height / 2f))
-        }
-
-        val slot = width / daily.size
-        val barWidth = (slot * 0.7f).coerceAtLeast(1.dp.toPx())
-        daily.forEachIndexed { index, (_, value) ->
-            if (value == 0) return@forEachIndexed
-            val barHeight = height * value / max
-            drawRoundRect(
-                color = barColor,
-                topLeft = Offset(left + slot * index + (slot - barWidth) / 2, baseline - barHeight),
-                size = Size(barWidth, barHeight),
-                cornerRadius = CornerRadius(2.dp.toPx()),
-            )
-        }
+        val area = drawBars(daily.map { it.second }, max, barColor, gridColor, measurer, labelStyle)
 
         trend?.let { line ->
-            fun x(date: LocalDate) = left + slot * (ChronoUnit.DAYS.between(daily.first().first, date) + 0.5f)
-            fun y(value: Float) = baseline - height * value / max
+            fun x(date: LocalDate) = area.left + area.slot * (ChronoUnit.DAYS.between(daily.first().first, date) + 0.5f)
+            fun y(value: Float) = area.baseline - area.height * value / max
             val start = Offset(x(line.firstDay), y(line.start))
             val end = Offset(x(line.lastDay), y(line.end))
             // Si la recta baja de cero, se corta en el eje.
-            clipRect(left, top, size.width - right, baseline) {
+            clipRect(area.left, area.top, area.right, area.baseline) {
                 // El borde del color del fondo la separa de las barras que cruza.
                 drawLine(haloColor, start, end, strokeWidth = 5.dp.toPx(), cap = StrokeCap.Round)
                 drawLine(lineColor, start, end, strokeWidth = 2.5.dp.toPx(), cap = StrokeCap.Round)
@@ -231,9 +255,30 @@ fun DailyBarChart(daily: List<Pair<LocalDate, Int>>, trend: Trend?, goal: Counte
         }
 
         val fromLabel = measurer.measure(daily.first().first.short(), labelStyle)
-        drawText(fromLabel, topLeft = Offset(left, size.height - fromLabel.size.height))
+        drawText(fromLabel, topLeft = Offset(area.left, size.height - fromLabel.size.height))
         val toLabel = measurer.measure(daily.last().first.short(), labelStyle)
-        drawText(toLabel, topLeft = Offset(size.width - right - toLabel.size.width, size.height - toLabel.size.height))
+        drawText(toLabel, topLeft = Offset(area.right - toLabel.size.width, size.height - toLabel.size.height))
+    }
+}
+
+/** Barras con lo sumado en cada hora del día (de 0 a 23), para ver en qué horarios se hace más. */
+@Composable
+fun HourlyBarChart(hourly: List<Int>, modifier: Modifier = Modifier) {
+    if (hourly.isEmpty()) return
+    val barColor = MaterialTheme.colorScheme.primary
+    val gridColor = MaterialTheme.colorScheme.outlineVariant
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val measurer = rememberTextMeasurer()
+    val max = hourly.max().coerceAtLeast(1)
+
+    Canvas(modifier.fillMaxWidth().height(180.dp)) {
+        val area = drawBars(hourly, max, barColor, gridColor, measurer, labelStyle)
+        // Cada seis horas, centrada debajo de la barra de esa hora.
+        for (hour in hourly.indices step 6) {
+            val label = measurer.measure("$hour h", labelStyle)
+            val center = area.left + area.slot * (hour + 0.5f)
+            drawText(label, topLeft = Offset(center - label.size.width / 2f, size.height - label.size.height))
+        }
     }
 }
 

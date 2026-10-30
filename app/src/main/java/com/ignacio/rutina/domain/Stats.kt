@@ -80,9 +80,14 @@ data class CounterStats(
     val best: Pair<LocalDate, Int>?,
     /** Null si todavía no hay [MIN_TREND_DAYS] días completos en el período. */
     val trend: Trend?,
+    /** Lo sumado en cada hora del día (de 0 a 23) en todo el período. */
+    val hourly: List<Int>,
 ) {
     val total: Int = daily.sumOf { it.second }
     val today: Int = daily.lastOrNull()?.second ?: 0
+
+    /** La hora en que más se sumó, o null si en el período no hay nada. */
+    val peakHour: Int? = hourly.indices.maxByOrNull { hourly[it] }?.takeIf { hourly[it] > 0 }
 }
 
 fun counterStats(task: Task, entries: List<Entry>, from: LocalDate, today: LocalDate, zone: ZoneId): CounterStats {
@@ -100,7 +105,13 @@ fun counterStats(task: Task, entries: List<Entry>, from: LocalDate, today: Local
         CounterGoal.MORE -> daily.filter { it.second > 0 }.maxByOrNull { it.second }
         CounterGoal.LESS -> complete.minByOrNull { it.second }
     }
-    return CounterStats(daily, daily.sumOf { it.second }.toFloat() / activeDays, best, trend(complete))
+    // Se suman las cantidades y no los registros: 8 anotados como +5, +1, +1 y +1 son 8, no 4.
+    val byHour = entries
+        .map { it.doneAt.toLocalDateTime(zone) to it.amount }
+        .filter { (at, _) -> at.toLocalDate() in from..today }
+        .groupBy({ (at, _) -> at.hour }, { (_, amount) -> amount })
+    val hourly = (0..23).map { byHour[it]?.sum() ?: 0 }
+    return CounterStats(daily, daily.sumOf { it.second }.toFloat() / activeDays, best, trend(complete), hourly)
 }
 
 /** Mínimo de días completos para calcular una tendencia. */

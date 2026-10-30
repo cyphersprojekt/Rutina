@@ -108,6 +108,40 @@ class StatsTest {
         assertEquals(LocalDate.of(2026, 10, 8) to 25, stats.best)
     }
 
+    @Test
+    fun `por hora suma las cantidades de todos los dias del periodo`() {
+        val coffee = Task(id = 4, name = "Café", kind = TaskKind.COUNTER, createdAt = 0)
+        fun add(day: Int, hour: Int, minute: Int, amount: Int) =
+            Entry(taskId = 4, doneAt = LocalDateTime.of(2026, 10, day, hour, minute).toEpochMillis(zone), amount = amount)
+        val entries = listOf(
+            // Antes del período: no cuenta.
+            add(1, 10, 0, 50),
+            // Ocho de una vez, anotados de a poco.
+            add(8, 10, 5, 5), add(8, 10, 20, 1), add(8, 10, 40, 1), add(8, 10, 59, 1),
+            add(9, 10, 30, 2),
+            add(9, 15, 0, 1),
+            add(10, 23, 59, 3),
+        )
+
+        val stats = counterStats(coffee, entries, LocalDate.of(2026, 10, 4), LocalDate.of(2026, 10, 10), zone)
+
+        assertEquals(24, stats.hourly.size)
+        assertEquals(10, stats.hourly[10])
+        assertEquals(1, stats.hourly[15])
+        assertEquals(3, stats.hourly[23])
+        assertEquals(14, stats.hourly.sum())
+        assertEquals(10, stats.peakHour)
+    }
+
+    @Test
+    fun `sin registros en el periodo no hay hora de mas`() {
+        val coffee = Task(id = 4, name = "Café", kind = TaskKind.COUNTER, createdAt = 0)
+        val stats = counterStats(coffee, emptyList(), LocalDate.of(2026, 10, 4), LocalDate.of(2026, 10, 10), zone)
+
+        assertEquals(List(24) { 0 }, stats.hourly)
+        assertNull(stats.peakHour)
+    }
+
     private fun days(vararg totals: Int): List<Pair<LocalDate, Int>> =
         totals.mapIndexed { index, total -> LocalDate.of(2026, 10, 1).plusDays(index.toLong()) to total }
 

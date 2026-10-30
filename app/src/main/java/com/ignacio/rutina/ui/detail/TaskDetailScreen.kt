@@ -42,6 +42,7 @@ import com.ignacio.rutina.ui.components.ChoiceRow
 import com.ignacio.rutina.ui.components.ConfirmDialog
 import com.ignacio.rutina.ui.components.DailyBarChart
 import com.ignacio.rutina.ui.components.EmptyHint
+import com.ignacio.rutina.ui.components.HourlyBarChart
 import com.ignacio.rutina.ui.components.PunctualityChart
 import com.ignacio.rutina.ui.components.PunctualityLegend
 import com.ignacio.rutina.ui.components.SectionHeader
@@ -244,6 +245,19 @@ private fun CounterDetail(
         item { SectionHeader("Por día") }
         item { DailyBarChart(stats.daily, stats.trend, state.task.goal, Modifier.padding(horizontal = 16.dp)) }
         item { TrendSummary(stats.trend, state.task.goal, unit, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)) }
+        item { SectionHeader("Por hora") }
+        item { HourlyBarChart(stats.hourly, Modifier.padding(horizontal = 16.dp)) }
+        stats.peakHour?.let { hour ->
+            item {
+                val amount = listOf("${stats.hourly[hour]}", unit).filter { it.isNotBlank() }.joinToString(" ")
+                Text(
+                    "Hora con más: de $hour a ${hour + 1} h, con $amount en $range días",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
+                )
+            }
+        }
         item { SectionHeader("Registros") }
         if (state.history.isEmpty()) {
             item { EmptyHint("No hay registros en este período.") }

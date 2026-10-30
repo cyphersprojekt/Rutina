@@ -21,6 +21,7 @@ App de Android para llevar la rutina diaria: recordatorios con horario que avisa
 - Cada uno tiene una unidad y un incremento, del que salen los botones rápidos (por ejemplo, un incremento de 10 da +1, +5 y +10).
 - Tienen un objetivo: *hacer más* (flexiones) o *hacer menos* (cigarrillos). Con eso las estadísticas saben si un cambio es bueno o malo.
 - Estadísticas: total, promedio por día y mejor día, todo contado desde el primer registro. Incluyen un gráfico por día con la **tendencia**, que dice si venís haciendo cada vez más, cada vez menos o sin un rumbo claro. La tendencia aparece desde los 5 días completos y no cuenta el día de hoy, que todavía no terminó.
+- Un gráfico **por hora** suma lo de cada hora del día en todo el período, para ver en qué horarios se hace más (cuándo se fuma, a qué hora se toma café…).
 
 **Categorías**
 - Agrupan las tareas (Trabajo, Ejercicio…). En **Hoy** se puede filtrar por categoría y ver el avance de cada una.
